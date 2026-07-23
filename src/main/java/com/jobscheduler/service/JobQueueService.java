@@ -13,7 +13,7 @@ public class JobQueueService {
 
     private static final String QUEUE_KEY = "job:queue";
 
-    private final StringRedisTemplate redisTemplate;
+    private final StringRedisTemplate redisTemplate;                //spring's redis client 
 
     public void enqueue(String jobId) {
         // LPUSH - new jobs go on the left end
@@ -27,7 +27,7 @@ public class JobQueueService {
      * three workers call this at the exact same millisecond.
      */
     public Optional<String> dequeueBlocking(Duration timeout) {
-        String jobId = redisTemplate.opsForList().rightPop(QUEUE_KEY, timeout);
+        String jobId = redisTemplate.opsForList().rightPop(QUEUE_KEY, timeout);           //timeout is applied so not a RPOP its BRPOP 
         return Optional.ofNullable(jobId);
     }
 }

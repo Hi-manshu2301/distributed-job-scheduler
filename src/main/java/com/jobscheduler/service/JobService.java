@@ -22,17 +22,17 @@ public class JobService {
 
     public JobResponse submitJob(JobRequest request) {
         Job job = new Job();
-        job.setType(request.getType());
-        job.setPayload(request.getPayload());
-        if (request.getMaxRetries() != null) {
+        job.setType(request.getType());                             //copy type from request
+        job.setPayload(request.getPayload());                       //store json payload
+        if (request.getMaxRetries() != null) {                      //if client send the max retry use them otherwise default 
             job.setMaxRetries(request.getMaxRetries());
         }
         job.setStatus(JobStatus.PENDING);
 
-        job = jobRepository.save(job); // persist first, so we have an ID
-        jobQueueService.enqueue(job.getId().toString()); // then hand it to workers
+        job = jobRepository.save(job);                              // add to postgres so we got id for redis 
+        jobQueueService.enqueue(job.getId().toString());            // then push job id to redis - worker will fetch the full job from redis using ID
 
-        return new JobResponse(job);
+        return new JobResponse(job);                                
     }
 
     public JobResponse getJob(UUID id) {
@@ -42,7 +42,7 @@ public class JobService {
     }
 
     public List<JobResponse> listJobs() {
-        return jobRepository.findAllByOrderByCreatedAtDesc()
+        return jobRepository.findAllByOrderByCreatedAtDesc()        
                 .stream()
                 .map(JobResponse::new)
                 .collect(Collectors.toList());
@@ -54,14 +54,14 @@ public class JobService {
      */
     public JobResponse retryJob(UUID id) {
         Job job = jobRepository.findById(id)
-                .orElseThrow(() -> new JobNotFoundException(id));
+                .orElseThrow(() -> new JobNotFoundException(id));       //fetch job using id if not find throw job not found
 
         job.setStatus(JobStatus.PENDING);
         job.setRetryCount(0);
         job.setErrorMessage(null);
-        job = jobRepository.save(job);
+        job = jobRepository.save(job);                                  //update database
 
-        jobQueueService.enqueue(job.getId().toString());
+        jobQueueService.enqueue(job.getId().toString());                //push id back to redis
         return new JobResponse(job);
     }
 }

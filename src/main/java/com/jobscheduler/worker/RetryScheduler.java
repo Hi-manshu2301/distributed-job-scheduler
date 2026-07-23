@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -25,9 +26,13 @@ public class RetryScheduler {
     private final JobQueueService jobQueueService;
 
     @Scheduled(fixedDelay = 1000)
+    @Transactional
     public void requeueDueRetries() {
         List<Job> dueJobs = jobRepository.findRetryableJobsDue();
         for (Job job : dueJobs) {
+            job.setStatus(com.jobscheduler.entity.JobStatus.PENDING);
+            jobRepository.save(job);
+
             jobQueueService.enqueue(job.getId().toString());
             log.info("Re-queued job {} for retry attempt {}", job.getId(), job.getRetryCount() + 1);
         }

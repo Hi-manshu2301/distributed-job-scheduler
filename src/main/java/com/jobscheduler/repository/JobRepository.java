@@ -2,8 +2,12 @@ package com.jobscheduler.repository;
 
 import com.jobscheduler.entity.Job;
 import com.jobscheduler.entity.JobStatus;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 
 
 import java.util.List;          //repo method rerturn multiple rows eg.- 10 pending jobs so we need list
@@ -16,6 +20,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {         //my r
     // Used by the dashboard to page through jobs, most recent first
     List<Job> findAllByOrderByCreatedAtDesc();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
     @Query("SELECT j FROM Job j WHERE j.status = 'RETRYING' AND j.runAt <= CURRENT_TIMESTAMP")
     List<Job> findRetryableJobsDue();
 }

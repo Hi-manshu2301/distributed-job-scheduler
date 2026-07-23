@@ -44,6 +44,11 @@ public class JobWorker {
             return;
         }
 
+        if(job.getStatus() == JobStatus.SUCCESS ||job.getStatus() == JobStatus.FAILED ||job.getStatus() == JobStatus.CANCELLED){
+            log.warn("Job {} already in terminal state {} - skipping duplicate processing",
+                    jobId, job.getStatus());
+            return;
+        }
         job.setStatus(JobStatus.RUNNING);
         jobRepository.save(job);
         log.info("Processing job {} (type={}, attempt={})", jobId, job.getType(), job.getRetryCount() + 1);
