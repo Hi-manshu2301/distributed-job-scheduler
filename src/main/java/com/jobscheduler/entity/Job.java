@@ -17,18 +17,17 @@ public class Job {
     @GeneratedValue
     private UUID id;
 
-    // A logical job "type" the worker uses to decide how to execute it,
-    // e.g. "SEND_EMAIL", "GENERATE_REPORT", "RESIZE_IMAGE"
-    @Column(nullable = false)
-    private String type;
+
+    @Column(nullable = false)                          //database coulumn can't be null
+    private String type;                               //store send email, generate report etc - worker will later check it and execute the corresponding logic  
 
     // Arbitrary JSON payload for the job, stored as text.
-    // Kept as a raw string so the scheduler stays agnostic to job-specific shapes.
+    //different job type need diff data, keeping it as JSON so scheduler remain generic, don't need to change DB schema
     @Column(columnDefinition = "TEXT")
     private String payload;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false)                           //every job must have status
     private JobStatus status = JobStatus.PENDING;
 
     @Column(name = "retry_count", nullable = false)
