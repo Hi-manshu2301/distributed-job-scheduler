@@ -73,22 +73,45 @@ curl http://localhost:8080/api/jobs
 curl -X POST http://localhost:8080/api/jobs/{id}/retry
 ```
 
-## What to say about this in an interview
+## Design decisions & lessons learned
 
-- Why Redis `BRPOP` over a naive `LPOP` in a loop: `LPOP` requires a
-  check-then-act (see if empty, then pop) which is a race condition
-  across processes; `BRPOP` is a single atomic command with built-in
-  blocking, so it doesn't need polling-with-sleep AND it removes the race.
-- Why job state lives in Postgres, not Redis: Redis holds *only* the
-  queue (ephemeral, can be flushed/restarted); Postgres holds durable
-  history so a job's status, retry count, and error message survive a
-  queue restart.
-- Trade-off acknowledged: this uses at-least-once delivery — if a worker
-  crashes mid-execution after popping a job but before writing SUCCESS,
-  that job is lost from the queue (not currently re-queued on worker
-  crash). A production version would move to Redis Streams with
-  consumer groups + acknowledgment, which supports reclaiming
-  unacknowledged messages. This is a good "what I'd improve" answer.
+**Why Redis `BRPOP` over a naive `LPOP`-in-a-loop:** `LPOP` requires a
+check-then-act pattern (check if the list is empty, then pop) which is a
+race condition across multiple processes. `BRPOP` is a single atomic,
+blocking command — no polling loop, no race.
+
+**Why job state lives in Postgres, not Redis:** Redis holds only the
+queue (ephemeral — a restart or flush loses it). Postgres holds durable
+history, so a job's status, retry count, and error message survive a
+queue restart.
+
+**A real concurrency bug found under load:** while stress-testing with
+concurrent worker instances, retry counts were observed exceeding
+`maxRetries` (e.g. 28 retries with a limit of 3), and some jobs were
+reprocessed after already reaching a terminal state.
+
+Root cause: every running instance (`api`, `worker-1`, `worker-2`) runs
+its own independent `RetryScheduler`, each polling Postgres every second
+for jobs whose retry backoff had elapsed. With no coordination between
+instances, two schedulers could read the same "due" job in the same
+window and both re-queue it — producing duplicate entries in Redis for a
+single job, each treated as an independent attempt.
+
+Fix: the query that finds due retry jobs now uses
+`@Lock(LockModeType.PESSIMISTIC_WRITE)` with a
+`jakarta.persistence.lock.timeout = -2` hint (Hibernate's `SKIP LOCKED`),
+wrapped in a `@Transactional` method. This tells Postgres to let only one
+instance claim a given row; every other instance skips it instead of
+waiting or re-reading it. Combined with an idempotency guard in
+`JobWorker` (skip jobs already in a terminal state), this closes the race
+at the database level rather than relying on application-level timing.
+
+**Known limitation (by design, not yet fixed):** this system uses
+at-least-once delivery. If a worker crashes after popping a job from
+Redis but before writing its final status, that job is lost from the
+queue and stays stuck in `RUNNING`. A future iteration could move from a
+plain Redis list to Redis Streams with consumer groups, which support
+acknowledgment and reclaiming unacknowledged messages after a timeout.
 
 ## Next steps (roadmap)
 
