@@ -64,4 +64,11 @@ public class JobService {
         jobQueueService.enqueue(job.getId().toString());                //push id back to redis
         return new JobResponse(job);
     }
+    //dead-letter endpoint
+    public List<JobResponse> getDeadLetterJobs() {
+    return jobRepository.findByStatus(JobStatus.FAILED)
+            .stream()
+            .map(JobResponse::new)
+            .collect(Collectors.toList());
+    }
 }

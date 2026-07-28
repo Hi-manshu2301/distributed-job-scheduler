@@ -38,4 +38,9 @@ public class JobController {
     public JobResponse retryJob(@PathVariable UUID id) {
         return jobService.retryJob(id);
     }
+
+    @GetMapping("/dead-letter")
+    public List<JobResponse> getDeadLetterJobs() {
+        return jobService.getDeadLetterJobs();
+    }
 }
