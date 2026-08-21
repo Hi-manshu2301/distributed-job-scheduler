@@ -3,6 +3,7 @@ package com.jobscheduler.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -16,4 +17,7 @@ public class JobRequest {
 
     // Optional override; defaults to 3 in the entity if not provided
     private Integer maxRetries;
+
+    //if set for the future time, the job won't be queued until then if omitted in future job will run instantly
+    private Instant runAt;
 }

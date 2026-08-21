@@ -24,4 +24,10 @@ public interface JobRepository extends JpaRepository<Job, UUID> {         //my r
     @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
     @Query("SELECT j FROM Job j WHERE j.status = 'RETRYING' AND j.runAt <= CURRENT_TIMESTAMP")
     List<Job> findRetryableJobsDue();
+
+    // same locking pattern as find retryable jobs for the ones which are scheduled for later
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")})
+    @Query("SELECT j FROM Job j WHERE j.status = 'SCHEDULED' AND j.runAt <= CURRENT_TIMESTAMP")
+    List<Job> findScheduledJobsDue();
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -21,19 +22,28 @@ public class JobService {
     private final JobQueueService jobQueueService;
 
     public JobResponse submitJob(JobRequest request) {
-        Job job = new Job();
-        job.setType(request.getType());                             //copy type from request
-        job.setPayload(request.getPayload());                       //store json payload
-        if (request.getMaxRetries() != null) {                      //if client send the max retry use them otherwise default 
-            job.setMaxRetries(request.getMaxRetries());
-        }
-        job.setStatus(JobStatus.PENDING);
-
-        job = jobRepository.save(job);                              // add to postgres so we got id for redis 
-        jobQueueService.enqueue(job.getId().toString());            // then push job id to redis - worker will fetch the full job from redis using ID
-
-        return new JobResponse(job);                                
+    Job job = new Job();
+    job.setType(request.getType());                                 //copy type from request
+    job.setPayload(request.getPayload());                           //store json payload
+    if (request.getMaxRetries() != null) {                          //if client send the max retry use them otherwise default
+        job.setMaxRetries(request.getMaxRetries());
     }
+
+    Instant scheduledFor = request.getRunAt() != null ? request.getRunAt() : Instant.now();
+    job.setRunAt(scheduledFor);
+
+    boolean isDueNow = !scheduledFor.isAfter(Instant.now());
+    job.setStatus(isDueNow ? JobStatus.PENDING : JobStatus.SCHEDULED);
+
+    job = jobRepository.save(job);                                  //add to postgres so we got id for redis
+
+    if (isDueNow) {
+        jobQueueService.enqueue(job.getId().toString());            //push job id to redis - worker will fetch the full job from redis using ID
+    }
+    // else: leave it as SCHEDULED - DelayedJobScheduler enqueues it once due
+
+    return new JobResponse(job);
+}
 
     public JobResponse getJob(UUID id) {
         Job job = jobRepository.findById(id)

@@ -1,6 +1,7 @@
 package com.jobscheduler.entity;
 
 public enum JobStatus {
+    SCHEDULED,    //Created for the future run at, waiting to be queued  
     PENDING,     // created, waiting in the Redis queue
     RUNNING,     // picked up by a worker, currently executing
     SUCCESS,     // completed without error
